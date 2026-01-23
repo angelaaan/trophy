@@ -19,6 +19,11 @@
   },
   "homepage": "https://github.com/angelaaan/trophy#readme",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "connect-sqlite3": "^0.9.16",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
     "sqlite3": "^5.1.7"
   }
 }

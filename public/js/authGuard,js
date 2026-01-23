@@ -1,0 +1,13 @@
+(async () => {
+  try {
+    const res = await fetch("/api/me");
+    if (!res.ok) {
+      window.location.href = "./login.html";
+      return;
+    }
+    const data = await res.json();
+    console.log("Logged in as", data.user.username);
+  } catch {
+    window.location.href = "./login.html";
+  }
+})();

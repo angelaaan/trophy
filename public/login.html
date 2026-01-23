@@ -19,14 +19,20 @@
       <h1 style="font-family: Anton, sans-serif; letter-spacing: 0.06em; margin: 0 0 10px;">LOGIN</h1>
       <p style="font-style: italic; margin-top: 0;">(we’ll wire auth next)</p>
 
-      <form>
-        <label>Email</label><br />
-        <input type="email" placeholder="you@example.com" style="width:100%; padding:12px; margin:6px 0 14px;" />
-        <label>Password</label><br />
-        <input type="password" placeholder="••••••••" style="width:100%; padding:12px; margin:6px 0 14px;" />
+        <form id="loginForm">
+            <label>username</label><br />
+            <input id="loginUsername" type="text" placeholder="yourusername" style="width:100%; padding:12px; margin:6px 0 14px;" />
 
-        <button type="button" class="btn btn-pill" style="width: 100%;">login</button>
-      </form>
+            <label>password</label><br />
+            <input id="loginPassword" type="password" placeholder="••••••••" style="width:100%; padding:12px; margin:6px 0 14px;" />
+
+            <button type="submit" class="btn btn-pill" style="width: 100%;">login</button>
+        </form>
+
+        <p id="loginMsg" style="margin-top:12px;"></p>
+
+        <script src="./js/login.js"></script>
+
 
       <p style="margin-top: 18px;">
         New here? <a href="./signup.html">Signup</a>

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trophy - Home</title>
+    <!-- Anton font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      margin: 0;
+      height: 100vh;
+      background: url("./assets/homebg.png") center/cover no-repeat;
+      font-family: Arial, sans-serif;
+    }
+
+    .shelf {
+      position: fixed;
+      top: 24px;
+      right: 24px;
+    }
+
+    .shelf button {
+      padding: 10px 18px;
+      border-radius: 999px;
+      border: 3px solid #000;
+      background: #fff;
+      font-family: "Anton", sans-serif;
+      letter-spacing: 1px;
+      cursor: pointer;
+    }
+
+    .title {
+        font-family: "Anton", sans-serif;
+      position: fixed;
+      top: 32px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 90px;
+      letter-spacing: 6px;
+    }
+
+    .btn-icon {
+      pointer-events: auto;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      border: 3px solid #000;
+      background: rgba(255,255,255,0.9);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      font-size: 24px;
+      font-weight: 900;
+    }
+
+    .bottom {
+      position: fixed;
+      bottom: 48px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+    }
+
+    .pill {
+      border: none;
+      padding: 18px 32px;
+      border-radius: 999px;
+      background: #000;
+      color: #fff;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .msg {
+      position: fixed;
+      top: 120px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button class="shelf" id="shelfBtn">shelf</button>
+  </div>
+
+  <div class="title">#goals</div>
+  <div class="msg" id="who"></div>
+
+  <div class="bottom">
+    <button class="pill" id="createBtn">CREATE GOAL</button>
+  </div>
+
+  <script src="./js/authGuard.js"></script>
+  <script>
+    document.getElementById("createBtn").onclick = () => alert("create goal later");
+  </script>
+</body>
+</html>
