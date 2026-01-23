@@ -1,0 +1,137 @@
+/* ====== Base ====== */
+:root {
+  --bg: #ffffff;
+  --text: #0b0b0b;
+  --muted: #1a1a1a;
+  --border: #0b0b0b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  color: var(--text);
+  background: var(--bg);
+  font-family: "Lato", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+}
+
+/* ====== Landing ====== */
+body.landing {
+  display: grid;
+  place-items: center;
+  background-image: url("../assets/landingpagebg.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  padding: 48px 20px;
+}
+
+/* ====== Signup / Login background ====== */
+body.auth {
+  background-image: url("../assets/signuplogin.png");
+  padding-top: 120px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+}
+
+
+.landing-card {
+  width: min(980px, 100%);
+  min-height: 520px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 14px;
+
+  text-align: center;
+}
+
+.landing-title {
+  margin: 0;
+  font-family: "Anton", system-ui, sans-serif;
+  font-weight: 400;
+  font-size: clamp(84px, 30vw, 160px);
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+.landing-tagline {
+  margin: 0 0 12px 0;
+  font-style: italic;
+  font-weight: 700;
+  font-size: clamp(18px, 2.4vw, 34px);
+  color: var(--muted);
+}
+
+/* Buttons */
+.landing-actions {
+  display: flex;
+  gap: 28px;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.btn {
+  text-decoration: none;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-pill {
+  padding: 14px 34px;
+  border: 3px solid var(--border);
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: 22px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(2px);
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.btn-pill:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.btn-pill:active {
+  transform: translateY(0px);
+}
+
+/* Small screens: stack buttons */
+@media (max-width: 520px) {
+  .landing-actions {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .btn-pill {
+    width: 220px;
+  }
+}
+
+/* ====== Auth form tweaks ====== */
+body.auth input {
+  background: #000;
+  color: #fff;
+  border: 2px solid #000;
+}
+
+body.auth input::placeholder {
+  color: #aaa;
+}
+
+body.auth input:focus {
+  outline: none;
+  border-color: #fff;
+}
