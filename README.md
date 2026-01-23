@@ -1,6 +1,6 @@
-# Trophy 🏆
+# ˗ˏˋ ★ TROPHY ˎˊ˗
 
-A desktop-first goal tracking app where goals become trophies.
+A desktop-first goal tracking app where your goals become trophies !!
 
 Tech:
 - HTML, CSS, JavaScript
