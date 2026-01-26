@@ -1,4 +1,5 @@
 document.getElementById("signupForm").addEventListener("submit", async (e) => {
+  //stops browsers from reloading and lets JS take over
   e.preventDefault();
 
   const username = document.getElementById("signupUsername").value.trim();

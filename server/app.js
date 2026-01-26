@@ -1,3 +1,7 @@
+const goalsRoutes = require("./routes/goals.routes");
+const accomplishmentsRoutes = require("./routes/accomplishments.routes");
+const tasksRoutes = require("./routes/tasks.routes");
+
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -15,10 +19,8 @@ app.use(cors()); // TODO : lock this down
 app.use(express.json());
 
 app.use(express.static(path.join(__dirname, "..", "public")));
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "public", "index.html"));
-});
+console.log("STATIC DIR =", path.join(__dirname, "..", "public"));
+console.log("Expect home.js at =", path.join(__dirname, "..", "public", "js", "home.js"));
 
 app.get("/", (req, res) => {
   res.redirect("/home.html");
@@ -46,6 +48,14 @@ app.use(
   })
 );
 
+// requires authentication to start a session (security)
+function requireAuth(req, res, next) {
+  if (!req.session.user) {
+    return res.status(401).json({ error: "Not logged in" });
+  }
+  next();
+}
+
 // -------- AUTH ROUTES --------
 
 // Signup: create user
@@ -53,12 +63,12 @@ app.post("/api/signup", (req, res) => {
   const { username, password } = req.body || {};
 
   if (!username || !password) {
-    return res.status(400).json({ error: "i think your forgot smth.." });
+    return res.status(400).json({error: "i think your forgot smth.."});
   }
 
   // basic length check
   if (password.length < 6) {
-    return res.status(400).json({ error: "weak security :/ passwrd must be at least 6 characters" });
+    return res.status(400).json({error: "weak security :/ passwrd must be at least 6 characters"});
   }
 
   // hash it for protection
@@ -122,4 +132,50 @@ app.post("/api/logout", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
   console.log(`Try opening http://localhost:${PORT}/index.html`);
+});
+
+// -------- GOAL ROUTES --------
+
+//creating goals
+app.post("/api/goals", requireAuth, (req, res) => {
+  const { title, description } = req.body;
+  const username = req.session.user.username;
+
+  if (!title) {
+    return res.status(400).json({ error: "a title is required" });
+  }
+
+  db.run(
+    `INSERT INTO goals (username, title, description)
+     VALUES (?, ?, ?)`,
+    [username, title, description || ""],
+    function (err) {
+      if (err) {
+        return res.status(500).json({ error: "oh no there was a database error" });
+      }
+      res.status(201).json({
+        ok: true,
+        goal_id: this.lastID,
+      });
+    }
+  );
+});
+
+// get goals as list for cards
+app.get("/api/goals", requireAuth, (req, res) => {
+  const username = req.session.user.username;
+
+  db.all(
+    `SELECT goal_id, title, description, created_at
+     FROM goals
+     WHERE username = ?
+     ORDER BY created_at DESC`,
+    [username],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ error: "oh no there was a database error" });
+      }
+      res.json(rows);
+    }
+  );
 });

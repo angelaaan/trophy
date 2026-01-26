@@ -135,3 +135,190 @@ body.auth input:focus {
   outline: none;
   border-color: #fff;
 }
+/* ====== Home ====== */
+body.home {
+  background-image: url("../assets/homebg.png");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  font-family: "Anton", system-ui, sans-serif;
+  overflow: hidden;
+}
+
+/* title */
+.home-title {
+  margin: 0;
+  position: fixed;
+  top: 22px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 92px;
+  font-weight: 400;
+  letter-spacing: 0.12em; /* more spacing */
+}
+
+/* shelf button (top right) */
+.home-shelf {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 3px solid #000;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(2px);
+  font-family: "Anton", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+}
+
+/* bottom CTA */
+.home-bottom {
+  position: fixed;
+  bottom: 44px;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.home-cta {
+  border: none;
+  padding: 18px 44px;
+  border-radius: 999px;
+  background: #000;
+  color: #fff;
+  font-family: "Anton", system-ui, sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.12em;
+  cursor: pointer;
+}
+
+/* goals grid */
+.goals-grid {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 170px;
+  bottom: 130px;
+  padding: 20px 70px;
+
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 28px;
+  align-content: start;
+  justify-items: center;
+  overflow: auto;
+}
+
+/* goal card */
+.goal-card {
+  width: 100%;
+  max-width: 180px;
+  aspect-ratio: 1 / 1;
+  border-radius: 10px;
+  background: rgba(120, 120, 120, 0.8);
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 14px;
+
+  color: #fff;
+  font-family: "Patrick Hand", system-ui, sans-serif; /* optional: if you want the handwritten look */
+  font-size: 26px;
+  line-height: 1.05;
+}
+
+/* if you don't want handwritten font, delete the line above and uncomment this:
+.goal-card { font-family: "Anton", system-ui, sans-serif; letter-spacing: 0.02em; }
+*/
+
+/* ====== Modal ====== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.modal-overlay.show {
+  display: grid;
+}
+
+.modal {
+  width: min(560px, 92vw);
+  border-radius: 18px;
+  border: 3px solid #000;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(4px);
+  padding: 22px 24px;
+  text-align: center;
+}
+
+.modal-title {
+  margin: 0 0 14px;
+  font-size: 64px;
+  letter-spacing: 0.1em;
+  font-weight: 400;
+}
+
+.modal-label {
+  display: block;
+  text-align: center;
+  margin: 12px 0 6px;
+  font-family: "Anton", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+}
+
+.modal-input,
+.modal-textarea {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 16px;
+  outline: none;
+  background: rgba(0, 0, 0, 0.85);
+  color: #fff;
+}
+
+.modal-textarea {
+  height: 120px;
+  resize: none;
+}
+
+.modal-error {
+  min-height: 18px;
+  margin: 10px 0 0;
+  color: #000;
+  font-family: system-ui, sans-serif;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-btn {
+  border-radius: 999px;
+  padding: 12px 18px;
+  font-family: "Anton", system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  border: 3px solid #000;
+}
+
+.modal-btn.ghost {
+  background: rgba(255, 255, 255, 0.8);
+  color: #000;
+}
+
+.modal-btn.solid {
+  background: #000;
+  color: #fff;
+}
+

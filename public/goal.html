@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trophy — Goal</title>
+
+  <!-- Fonts (match your vibe; tweak if you already load elsewhere) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Lato:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="css/goals.css" />
+</head>
+<body>
+  <div class="bg-noise"></div>
+
+  <!-- Header pinned (doesn't scroll) -->
+  <header class="goal-header">
+    <div class="goal-header-inner">
+      <div class="goal-title-wrap">
+        <h1 id="goalTitle" class="goal-title">Loading…</h1>
+        <p id="goalDesc" class="goal-desc"></p>
+      </div>
+
+      <div class="goal-actions">
+        <a class="btn ghost" href="home.html">← back</a>
+        <button id="logoutBtn" class="btn ghost">logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- LEFT: active accomplishments -->
+    <section class="panel panel-left">
+      <div class="panel-top">
+        <div class="panel-heading">ACCOMPLISHMENTS</div>
+        <button id="addAccomplishmentBtn" class="btn primary">
+          <span class="btn-icon">＋</span>
+          set accomplishment
+        </button>
+      </div>
+
+      <div id="activeList" class="list"></div>
+      <div id="emptyActive" class="empty hidden">no accomplishments yet — add one 👀</div>
+    </section>
+
+    <!-- RIGHT: completed accomplishments -->
+    <section class="panel panel-right">
+      <div class="panel-top">
+        <div class="panel-heading">COMPLETED ACCOMPLISHMENTS</div>
+      </div>
+
+      <div id="completedList" class="list"></div>
+      <div id="emptyCompleted" class="empty">none yet :( GET TO IT</div>
+    </section>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="js/goals.js"></script>
+</body>
+</html>
