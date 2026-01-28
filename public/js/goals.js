@@ -6,6 +6,28 @@
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const uid = () => Math.random().toString(16).slice(2) + Date.now().toString(16);
 
+  async function api(url, options = {}) {
+    const res = await fetch(url, {
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+    if (!res.ok) throw new Error(await res.text());
+    return res.json();
+  }
+
+  async function loadGoalFromDB(goalId) {
+    // expects server route: GET /api/goals/:goalId/full
+    return api(`/api/goals/${goalId}/full`);
+  }
+
+  async function reloadGoalAndRender() {
+    const g = await loadGoalFromDB(state.goalId);
+    state.goal = (typeof normalizeGoal === "function") ? normalizeGoal(g) : g;
+    render();
+  }
+
+
   function toast(msg, ms = 2000) {
     const t = $("#toast");
     if (!t) return;
@@ -49,59 +71,15 @@
   }
 
   function computeRepeatTotal(task) {
-    // Returns how many "expected completions" exist in the timeframe
-    // For non-repeat: 1
-    // For amount: amount
-    // For daily/weekly: from created_at (or today if missing) to until_date inclusive
-    if (!task.repeat || task.repeat.type === "none") return 1;
-
-    const type = task.repeat.type;
-    if (type === "amount") {
-      const amt = Number(task.repeat.amount || 1);
-      return Math.max(1, amt);
-    }
-
-    // daily/weekly
-    const until = task.repeat.until_date;
-    if (!until) return 1;
-
-    const created = task.created_at || todayStr();
-
-    if (type === "daily") {
-      return Math.max(1, daysBetweenInclusive(created, until));
-    }
-
-    if (type === "weekly") {
-      // count weeks inclusive from created week to until week
-      const s = new Date(created + "T00:00:00");
-      const e = new Date(until + "T00:00:00");
-      // Normalize to week starts
-      const sW = new Date(startOfWeekStr(s) + "T00:00:00");
-      const eW = new Date(startOfWeekStr(e) + "T00:00:00");
-      const diffWeeks = Math.round((eW - sW) / (86400000 * 7));
-      return Math.max(1, diffWeeks + 1);
-    }
-
-    return 1;
+    // DB: total_required is the "how many completions needed"
+    const n = Number(task.total_required || 1);
+    return Math.max(1, n);
   }
 
   function computeRepeatDoneCount(task) {
-    // For non-repeat: 1 if completed else 0
-    // For amount: completions.length capped at amount
-    // For daily/weekly: count unique period keys in completions
-    if (!task.repeat || task.repeat.type === "none") return task.completed ? 1 : 0;
-
-    const type = task.repeat.type;
-    const comps = Array.isArray(task.completions) ? task.completions : [];
-
-    if (type === "amount") {
-      const total = computeRepeatTotal(task);
-      return clamp(comps.length, 0, total);
-    }
-
-    // daily/weekly: completions stored as {periodKey, at}
-    const unique = new Set(comps.map((c) => c.periodKey));
-    return unique.size;
+    const total = computeRepeatTotal(task);
+    const done = Number(task.completion_count || 0);
+    return clamp(done, 0, total);
   }
 
   function currentPeriodKey(task) {
@@ -112,29 +90,12 @@
   }
 
   function canCompleteTaskNow(task) {
-    // If non-repeat:
-    // - can complete if not already completed
-    // If repeat:
-    // - can complete if current periodKey not already in completions
-    if (!task.repeat || task.repeat.type === "none") return !task.completed;
-
-    const type = task.repeat.type;
-    const total = computeRepeatTotal(task);
-    const done = computeRepeatDoneCount(task);
-
-    // if already finished all expected repetitions, no more checks allowed
-    if (done >= total) return false;
-
-    const key = currentPeriodKey(task);
-    if (!key) return false;
-
-    const comps = Array.isArray(task.completions) ? task.completions : [];
-    return !comps.some((c) => c.periodKey === key);
+    // Let backend enforce daily/weekly limits; we only block if fully complete
+    return !task.is_complete;
   }
 
   function isTaskFullyDone(task) {
-    if (!task.repeat || task.repeat.type === "none") return !!task.completed;
-    return computeRepeatDoneCount(task) >= computeRepeatTotal(task);
+    return !!task.is_complete;
   }
 
   function computeAccomplishmentProgress(acc) {
@@ -148,7 +109,7 @@
       const total = computeRepeatTotal(t);
       const done = computeRepeatDoneCount(t);
       totalUnits += total;
-      doneUnits += clamp(done, 0, total);
+      doneUnits += done;
     }
 
     const pct = totalUnits === 0 ? 0 : Math.round((doneUnits / totalUnits) * 100);
@@ -158,8 +119,32 @@
   function allTasksFullyDone(acc) {
     const tasks = acc.tasks || [];
     if (tasks.length === 0) return false;
-    return tasks.every(isTaskFullyDone);
+    return tasks.every(t => !!t.is_complete);
   }
+
+  async function maybeAutoComplete(accId) {
+    // reload fresh DB state first (so counts are real)
+    state.goal = await loadGoalFromDB(state.goalId);
+
+    const acc = (state.goal.accomplishments || []).find(a =>
+      (a.accomplishment_id ?? a.id) === accId
+    );
+    if (!acc) return;
+
+    const tasks = acc.tasks || [];
+    if (tasks.length < 1) return;
+
+    const allDone = tasks.every(t => t.is_complete === true);
+    if (!allDone) return;
+
+    // call your backend “complete accomplishment” endpoint
+    await api(`/api/accomplishments/${acc.accomplishment_id ?? accId}/complete`, {method: "POST",});
+
+    // reload + re-render so it moves + shows ⭐
+    state.goal = await loadGoalFromDB(state.goalId);
+    render();
+  }
+
 
   // ----------------------------
   // Temporary Storage Layer (localStorage)
@@ -192,23 +177,6 @@
       this._saveAll(data);
       return goal;
     },
-
-    ensureGoal(goalId) {
-      // Creates a fake goal if nothing exists, so the page works instantly.
-      // Later, backend will populate this.
-      let goal = this.getGoal(goalId);
-      if (!goal) {
-        goal = {
-          id: goalId,
-          title: "hit 55kg",
-          description: "",
-          accomplishments: [],
-          completed: []
-        };
-        this.upsertGoal(goal);
-      }
-      return goal;
-    }
   };
 
   // ----------------------------
@@ -220,6 +188,21 @@
     // per accomplishment: whether we are showing completed tasks (eye toggle)
     showCompletedTasksByAcc: new Map()
   };
+
+  function normalizeGoal(goal) {
+    return {
+      ...goal,
+      accomplishments: (goal.accomplishments || []).map(acc => ({
+        ...acc,
+        id: acc.accomplishment_id,
+        tasks: (acc.tasks || []).map(t => ({
+          ...t,
+          id: t.task_id
+        }))
+      }))
+    };
+  }
+
 
   // ----------------------------
   // Rendering
@@ -233,7 +216,7 @@
     $("#goalDesc").textContent = goal.description || "";
 
     const active = (goal.accomplishments || []).filter((a) => !a.completed_at);
-    const completed = goal.completed || [];
+    const completed = (goal.accomplishments || []).filter(a => a.completed_at);
 
     const activeList = $("#activeList");
     const completedList = $("#completedList");
@@ -261,6 +244,8 @@
     const card = document.createElement("div");
     card.className = "acc-card";
     card.dataset.accId = acc.id;
+    card.setAttribute("data-acc-id", acc.id);
+
 
     const bar = document.createElement("div");
     bar.className = "acc-bar";
@@ -291,7 +276,6 @@
       const current = state.showCompletedTasksByAcc.get(acc.id) || false;
       state.showCompletedTasksByAcc.set(acc.id, !current);
       // keep expanded state and re-render just this card by full refresh (simple)
-      persist();
       render();
       // reopen if it was expanded
       const newCard = findAccCard(acc.id);
@@ -396,7 +380,6 @@
     if (acc._expand) {
       card.classList.add("expanded");
       delete acc._expand;
-      persist();
     }
 
     return card;
@@ -555,9 +538,12 @@
   }
 
   function buildRepeatBoxHTML(task) {
-    const type = task.repeat?.type || "none";
-    const until = task.repeat?.until_date || "";
-    const amount = task.repeat?.amount || "";
+    // DB fields: repeat_type: "none" | "daily" | "weekly" | "amount" (or "x")
+    const typeRaw = (task.repeat_type || "none").toLowerCase();
+    const type = (typeRaw === "x") ? "amount" : typeRaw;
+
+    const until = task.end_date || "";
+    const amount = (type === "amount") ? String(task.total_required || "") : "";
 
     return `
       <div class="small"><b>repeat</b> (choose one)</div>
@@ -628,27 +614,34 @@
   // ----------------------------
   // Actions (mutations)
   // ----------------------------
-  function persist() {
-    Storage.upsertGoal(state.goal);
+
+  async function addAccomplishment() {
+    try {
+      const title = "NEW ACCOMPLISHMENT";
+
+      const res = await api(`/api/goals/${state.goalId}/accomplishments`, {
+        method: "POST",
+        body: JSON.stringify({ title }),
+      });
+
+      await reloadGoalAndRender();
+
+      // auto expand the newly created accomplishment (optional)
+      const newId = res.accomplishment_id;
+      const acc = (state.goal.accomplishments || []).find(a =>
+        (a.accomplishment_id ?? a.id) === newId || a.id === newId
+      );
+      if (acc) {
+        acc._expand = true;
+        render();
+      }
+    } catch (e) {
+      console.error(e);
+      toast("couldn't add accomplishment");
+    }
   }
 
-  function addAccomplishment() {
-    const goal = state.goal;
-    const acc = {
-      id: uid(),
-      title: "NEW ACCOMPLISHMENT",
-      created_at: todayStr(),
-      tasks: [],
-      completed_at: null,
-      _expand: true // expand on first render
-    };
-    goal.accomplishments.push(acc);
-
-    persist();
-    render();
-  }
-
-  function openEditAccomplishment(accId) {
+  async function openEditAccomplishment(accId) {
     const acc = findAcc(accId);
     if (!acc) return;
 
@@ -656,25 +649,38 @@
     if (newName === null) return;
 
     const trimmed = newName.trim();
+
+    // empty name -> offer delete
     if (!trimmed) {
       const sure = confirm("Empty name. Delete accomplishment instead?");
-      if (sure) deleteAccomplishment(accId);
+      if (sure) await deleteAccomplishment(accId);
       return;
     }
 
-    acc.title = trimmed;
-    persist();
-    render();
+    try {
+      await api(`/api/accomplishments/${accId}`, {
+        method: "PUT",
+        body: JSON.stringify({ title: trimmed }),
+      });
+
+      await reloadGoalAndRender();
+    } catch (e) {
+      console.error(e);
+      toast("couldn't rename accomplishment");
+    }
   }
 
-  function deleteAccomplishment(accId) {
-    const goal = state.goal;
+  async function deleteAccomplishment(accId) {
     const ok = confirm("Delete this accomplishment? (tasks included)");
     if (!ok) return;
 
-    goal.accomplishments = (goal.accomplishments || []).filter((a) => a.id !== accId);
-    persist();
-    render();
+    try {
+      await api(`/api/accomplishments/${accId}`, { method: "DELETE" });
+      await reloadGoalAndRender();
+    } catch (e) {
+      console.error(e);
+      toast("couldn't delete accomplishment");
+    }
   }
 
   function completeAccomplishment(accId) {
@@ -703,118 +709,119 @@
       completed_at: acc.completed_at
     });
 
-    persist();
     render();
   }
 
-  function addTask(accId) {
-    const acc = findAcc(accId);
-    if (!acc) return;
+  async function addTask(accId) {
+    try {
+      // create in DB (repeat_type must exist; use "none" for now)
+      await api(`/api/accomplishments/${accId}/tasks`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: "GYM",
+          repeat_type: "none",
+          target_count: 1,
+          // optional: start_date/end_date left to defaults
+        }),
+      });
 
-    const task = {
-      id: uid(),
-      title: "GYM",
-      created_at: todayStr(),
-      completed: false,
-      repeat: { type: "none" },
-      completions: [] // for repeat tracking
-    };
+      // reload from DB so tasks now have real task_id
+      state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
+      render();
 
-    acc.tasks = acc.tasks || [];
-    acc.tasks.push(task);
-
-    persist();
-    render();
-    toast("task added. rename it.");
+      toast("task added. rename it.");
+    } catch (e) {
+      console.error(e);
+      toast("couldn't add task");
+    }
   }
 
-  function renameTask(accId, taskId, newTitle) {
-    const acc = findAcc(accId);
-    if (!acc) return;
-    const t = findTask(acc, taskId);
-    if (!t) return;
+  async function renameTask(accId, taskId, newTitle) {
+    const title = (newTitle || "").trim();
 
-    t.title = (newTitle || "").trim();
-    persist();
-    render();
+    try {
+      await api(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        body: JSON.stringify({ title }),
+      });
+
+      await reloadGoalAndRender();
+    } catch (e) {
+      console.error(e);
+      toast("couldn't rename task");
+    }
   }
 
-  function deleteTask(accId, taskId) {
-    const acc = findAcc(accId);
-    if (!acc) return;
-
+  async function deleteTask(accId, taskId) {
     const ok = confirm("Delete this task?");
     if (!ok) return;
 
-    acc.tasks = (acc.tasks || []).filter((t) => t.id !== taskId);
-    persist();
-    render();
+    try {
+      await api(`/api/tasks/${taskId}`, { method: "DELETE" });
+      await reloadGoalAndRender();
+    } catch (e) {
+      console.error(e);
+      toast("couldn't delete task");
+    }
   }
 
-  function setTaskRepeat(accId, taskId, type, until, amount) {
-    const acc = findAcc(accId);
-    if (!acc) return;
-    const t = findTask(acc, taskId);
-    if (!t) return;
+  async function setTaskRepeat(accId, taskId, type, until, amount) {
+    try {
+      const chosen = String(type || "none").toLowerCase();
 
-    if (!t.repeat) t.repeat = { type: "none" };
+      // Build payload for PUT /api/tasks/:task_id
+      // We let backend compute total_required for daily/weekly based on start/end dates.
+      const payload = { repeat_type: chosen };
 
-    t.repeat.type = type;
+      if (chosen === "daily" || chosen === "weekly") {
+        payload.end_date = until;      // DB field
+        payload.target_count = 1;      // weekly per-week target (you can upgrade UI later)
+        // don't send total_required; backend will compute
+      } else if (chosen === "amount") {
+        const n = Math.max(1, Number(amount || 1));
+        payload.repeat_type = "amount"; // backend supports amount/x
+        payload.total_required = n;
+        payload.target_count = n;
+        payload.end_date = null;
+      } else {
+        payload.repeat_type = "none";
+        payload.end_date = null;
+        payload.target_count = 1;
+        payload.total_required = 1;
+      }
 
-    if (type === "daily" || type === "weekly") {
-      t.repeat.until_date = until;
-      delete t.repeat.amount;
-    } else if (type === "amount") {
-      t.repeat.amount = Number(amount);
-      delete t.repeat.until_date;
-    } else {
-      delete t.repeat.until_date;
-      delete t.repeat.amount;
+      await api(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+      });
+
+      await reloadGoalAndRender();
+      toast("repeat updated.");
+    } catch (e) {
+      console.error(e);
+      toast("couldn't update repeat");
     }
-
-    // Reset completion state when changing repeat rules
-    t.completed = false;
-    t.completions = [];
-
-    persist();
-    render();
-    toast("repeat updated.");
   }
 
-  function completeTask(accId, taskId) {
-    const acc = findAcc(accId);
-    if (!acc) return;
-    const t = findTask(acc, taskId);
-    if (!t) return;
+  async function completeTask(accId, taskId) {
+    try {
+      // 1) tell backend “I checked this task”
+      await api(`/api/tasks/${taskId}/check`, { method: "POST" });
 
-    if (!canCompleteTaskNow(t)) {
-      toast("you’ve already completed this task for now!");
-      return;
-    }
+      // 2) refresh goal from DB (so progress + is_complete updates)
+      state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
 
-    // Non-repeat: mark completed
-    if (!t.repeat || t.repeat.type === "none") {
-      t.completed = true;
-      persist();
+      // 3) now see if accomplishment should auto-complete
+      await maybeAutoComplete(accId);
+
+      // 4) final render
       render();
-      return;
+    } catch (e) {
+      console.error(e);
+      toast("couldn't complete task (maybe already done for now?)");
     }
-
-    // Repeat: add completion for current period
-    const key = currentPeriodKey(t);
-    if (!key) return;
-
-    t.completions = Array.isArray(t.completions) ? t.completions : [];
-    t.completions.push({ periodKey: key, at: new Date().toISOString() });
-
-    // If repeat fully satisfied, keep showing it as done (it will disappear from incomplete list)
-    if (isTaskFullyDone(t)) {
-      // nothing else needed
-    }
-
-    persist();
-    render();
   }
+
 
   // ----------------------------
   // Finders
@@ -834,11 +841,22 @@
   // ----------------------------
   // Boot
   // ----------------------------
-  function init() {
+  async function init() {
     // Goal ID from URL, default "demo"
     const url = new URL(window.location.href);
-    state.goalId = url.searchParams.get("goalId") || "demo";
-    state.goal = Storage.ensureGoal(state.goalId);
+    state.goalId = url.searchParams.get("goal_id");
+    if(!state.goalId){
+      alert("missing goalID in url !!!");
+      return;
+    }
+
+    try{
+      state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
+      render();
+    } catch(e) {
+      console.error(e);
+      alert("couldnt load the goal!! (r u logged in .. is this ur goal..?)");
+    }
 
     // Wire buttons
     $("#addAccomplishmentBtn")?.addEventListener("click", addAccomplishment);
@@ -849,7 +867,6 @@
       toast("logout (frontend stub)");
     });
 
-    render();
   }
 
   document.addEventListener("DOMContentLoaded", init);

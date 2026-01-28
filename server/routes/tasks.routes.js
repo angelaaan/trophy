@@ -120,46 +120,53 @@ module.exports = function tasksRoutes({ db, requireAuth }) {
 
         const repeat = String(task.repeat_type || "none").toLowerCase();
 
-        if (repeat === "none") {
-          if (completionCount >= 1) return res.status(409).json({ error: "you already completed this task" });
-
-          return db.run(
+        const insertCompletion = () =>
+          db.run(
             `INSERT INTO task_completions (task_id, completed_date) VALUES (?, date('now'))`,
             [task_id],
             (err2) => {
               if (err2) return res.status(500).json({ error: "database error" });
-              res.json({ ok: true });
+
+              // return updated progress
+              db.get(
+                `SELECT COUNT(*) as cnt FROM task_completions WHERE task_id = ?`,
+                [task_id],
+                (err3, r3) => {
+                  if (err3) return res.status(500).json({ error: "database error" });
+                  const newCount = Number(r3?.cnt || 0);
+                  res.json({
+                    ok: true,
+                    completion_count: newCount,
+                    total_required: totalRequired,
+                    is_complete: totalRequired > 0 ? newCount >= totalRequired : false,
+                  });
+                }
+              );
             }
           );
+
+        if (repeat === "none") {
+          if (completionCount >= 1) return res.status(409).json({ error: "you already completed this task" });
+          return insertCompletion();
         }
 
         if (repeat === "daily") {
-          db.get(
+          return db.get(
             `SELECT COUNT(*) as cnt
              FROM task_completions
              WHERE task_id = ? AND completed_date = date('now')`,
             [task_id],
             (err2, r2) => {
               if (err2) return res.status(500).json({ error: "database error" });
-              if (Number(r2?.cnt || 0) >= 1) {
-                return res.status(409).json({ error: "you've already completed this task for now!" });
-              }
-              db.run(
-                `INSERT INTO task_completions (task_id, completed_date) VALUES (?, date('now'))`,
-                [task_id],
-                (err3) => {
-                  if (err3) return res.status(500).json({ error: "database error" });
-                  res.json({ ok: true });
-                }
-              );
+              if (Number(r2?.cnt || 0) >= 1) return res.status(409).json({ error: "you've already completed this task for now!" });
+              insertCompletion();
             }
           );
-          return;
         }
 
         if (repeat === "weekly") {
           const target = Number(task.target_count || 1);
-          db.get(
+          return db.get(
             `SELECT COUNT(*) as cnt
              FROM task_completions
              WHERE task_id = ?
@@ -167,32 +174,14 @@ module.exports = function tasksRoutes({ db, requireAuth }) {
             [task_id],
             (err2, r2) => {
               if (err2) return res.status(500).json({ error: "database error" });
-              if (Number(r2?.cnt || 0) >= target) {
-                return res.status(409).json({ error: "you've already completed this task for now!" });
-              }
-              db.run(
-                `INSERT INTO task_completions (task_id, completed_date) VALUES (?, date('now'))`,
-                [task_id],
-                (err3) => {
-                  if (err3) return res.status(500).json({ error: "database error" });
-                  res.json({ ok: true });
-                }
-              );
+              if (Number(r2?.cnt || 0) >= target) return res.status(409).json({ error: "you've already completed this task for now!" });
+              insertCompletion();
             }
           );
-          return;
         }
 
         if (repeat === "x" || repeat === "amount") {
-          db.run(
-            `INSERT INTO task_completions (task_id, completed_date) VALUES (?, date('now'))`,
-            [task_id],
-            (err2) => {
-              if (err2) return res.status(500).json({ error: "database error" });
-              res.json({ ok: true });
-            }
-          );
-          return;
+          return insertCompletion();
         }
 
         return res.status(400).json({ error: "invalid repeat_type" });

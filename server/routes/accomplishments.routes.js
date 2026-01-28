@@ -57,6 +57,8 @@ module.exports = function accomplishmentsRoutes({ db, requireAuth }) {
     });
   });
 
+  // completion logic
+  // only works if ALL tasks are complete, and there is at least 1 task.
   router.post("/api/accomplishments/:accomplishment_id/complete", requireAuth, (req, res) => {
     const accomplishment_id = Number(req.params.accomplishment_id);
     if (!accomplishment_id) return res.status(400).json({ error: "bad accomplishment_id" });

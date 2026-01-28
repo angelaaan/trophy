@@ -18,10 +18,6 @@ const PORT = 3000;
 app.use(cors()); // TODO : lock this down
 app.use(express.json());
 
-app.use(express.static(path.join(__dirname, "..", "public")));
-console.log("STATIC DIR =", path.join(__dirname, "..", "public"));
-console.log("Expect home.js at =", path.join(__dirname, "..", "public", "js", "home.js"));
-
 app.get("/", (req, res) => {
   res.redirect("/home.html");
 });
@@ -129,11 +125,6 @@ app.post("/api/logout", (req, res) => {
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`Backend running on http://localhost:${PORT}`);
-  console.log(`Try opening http://localhost:${PORT}/index.html`);
-});
-
 // -------- GOAL ROUTES --------
 
 //creating goals
@@ -178,4 +169,18 @@ app.get("/api/goals", requireAuth, (req, res) => {
       res.json(rows);
     }
   );
+});
+
+// -------- API ROUTES (IMPORTANT) --------
+app.use(goalsRoutes({ db, requireAuth }));
+app.use(accomplishmentsRoutes({ db, requireAuth }));
+app.use(tasksRoutes({ db, requireAuth }));
+
+// static frontend
+app.use(express.static(path.join(__dirname, "..", "public")));
+
+// start
+app.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+  console.log(`Try opening http://localhost:${PORT}/index.html`);
 });
