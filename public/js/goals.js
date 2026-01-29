@@ -185,8 +185,9 @@
   const state = {
     goalId: null,
     goal: null,
-    // per accomplishment: whether we are showing completed tasks (eye toggle)
-    showCompletedTasksByAcc: new Map()
+    showCompletedTasksByAcc: new Map(),
+    expandedAccIds: new Set(),
+    editingAccId: null
   };
 
   function normalizeGoal(goal) {
@@ -218,6 +219,10 @@
     const active = (goal.accomplishments || []).filter((a) => !a.completed_at);
     const completed = (goal.accomplishments || []).filter(a => a.completed_at);
 
+    // newest → oldest (by accomplishment_id; higher = newer)
+    active.sort((a, b) => (Number(b.id ?? b.accomplishment_id) - Number(a.id ?? a.accomplishment_id)));
+    completed.sort((a, b) => (Number(b.id ?? b.accomplishment_id) - Number(a.id ?? a.accomplishment_id)));
+
     const activeList = $("#activeList");
     const completedList = $("#completedList");
     activeList.innerHTML = "";
@@ -246,6 +251,9 @@
     card.dataset.accId = acc.id;
     card.setAttribute("data-acc-id", acc.id);
 
+    if (state.expandedAccIds.has(acc.id)) {
+      card.classList.add("expanded");
+    }
 
     const bar = document.createElement("div");
     bar.className = "acc-bar";
@@ -258,6 +266,62 @@
     const title = document.createElement("h3");
     title.className = "acc-title";
     title.textContent = acc.title || "NEW ACCOMPLISHMENT";
+
+    // if this one is being edited, make it editable + auto-focus
+    if (state.editingAccId === acc.id) {
+      title.contentEditable = "true";
+      title.classList.add("editing");
+
+      // focus + highlight text after it mounts
+      setTimeout(() => {
+        title.focus();
+        const range = document.createRange();
+        range.selectNodeContents(title);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }, 0);
+    }
+
+    // prevent card toggling when clicking the title
+    title.addEventListener("click", (e) => e.stopPropagation());
+
+    title.addEventListener("keydown", async (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        title.blur(); // triggers save in blur handler
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        state.editingAccId = null;
+        await reloadGoalAndRender();
+      }
+    });
+
+    title.addEventListener("blur", async () => {
+      if (state.editingAccId !== acc.id) return;
+
+      const newTitle = title.textContent.trim();
+      if (!newTitle) {
+        toast("title can't be empty");
+        // refocus
+        setTimeout(() => title.focus(), 0);
+        return;
+      }
+
+      try {
+        await api(`/api/accomplishments/${acc.id}`, {
+          method: "PUT",
+          body: JSON.stringify({ title: newTitle }),
+        });
+        state.editingAccId = null;
+        await reloadGoalAndRender();
+      } catch (err) {
+        console.error(err);
+        toast("couldn't save title");
+      }
+    });
+
     top.appendChild(title);
 
     const meta = document.createElement("div");
@@ -364,16 +428,22 @@
     card.appendChild(body);
 
     // Expand/collapse on click (but NOT when clicking buttons/inputs)
+// Expand/collapse on click (but NOT when clicking buttons/inputs)
     card.addEventListener("click", (e) => {
       const tag = e.target.tagName.toLowerCase();
       const isInteractive =
         e.target.closest("button") ||
         e.target.closest("input") ||
+        e.target.isContentEditable ||
         tag === "input" ||
         tag === "button";
       if (isInteractive) return;
 
+      const willExpand = !card.classList.contains("expanded");
       card.classList.toggle("expanded");
+
+      if (willExpand) state.expandedAccIds.add(acc.id);
+      else state.expandedAccIds.delete(acc.id);
     });
 
     // Auto-expand if this is the "new" one
@@ -454,9 +524,45 @@
     const repBtn = document.createElement("button");
     repBtn.className = "task-mini-btn";
     repBtn.textContent = "repeat";
+    repBtn.dataset.mode = "closed"; // closed | open
+
     repBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      toggleRepeatBox(row);
+
+      const box = $(".repeat-box", row);
+      if (!box) return;
+
+      const isHidden = box.classList.contains("hidden");
+
+      if (isHidden) {
+        // opening
+        box.classList.remove("hidden");
+        repBtn.textContent = "✓";
+        repBtn.dataset.mode = "open";
+      } else {
+        // already open -> SAVE
+        const chosen = box.querySelector('input[type="radio"][name="repeatType"]:checked')?.value || "none";
+        const until = box.querySelector('input[data-field="until_date"]')?.value || "";
+        const amt = box.querySelector('input[data-field="amount"]')?.value || "";
+
+        // validation (same rules you already had)
+        if ((chosen === "daily" || chosen === "weekly") && !until) {
+          toast("pick an end date for daily/weekly.");
+          return;
+        }
+        if (chosen === "amount" && (!amt || Number(amt) < 1)) {
+          toast("amount needs to be 1+");
+          return;
+        }
+
+        // save to DB
+        setTaskRepeat(accId, task.id, chosen, until, amt);
+
+        // close after saving
+        box.classList.add("hidden");
+        repBtn.textContent = "repeat";
+        repBtn.dataset.mode = "closed";
+      }
     });
     right.appendChild(repBtn);
 
@@ -584,31 +690,21 @@
   }
 
   function wireRepeatBox(box, accId, taskId) {
+    // no autosave — user saves by clicking ✓ on the repeat button
     const radios = $$('input[type="radio"][name="repeatType"]', box);
     const untilInput = $('input[data-field="until_date"]', box);
     const amountInput = $('input[data-field="amount"]', box);
 
-    function saveRepeat() {
-      const chosen = radios.find((r) => r.checked)?.value || "none";
-      const until = untilInput?.value || "";
-      const amt = amountInput?.value || "";
+    function refreshEnabledFields() {
+      const chosen = radios.find(r => r.checked)?.value || "none";
 
-      // Basic validation
-      if ((chosen === "daily" || chosen === "weekly") && !until) {
-        toast("pick an end date for daily/weekly.");
-        return;
-      }
-      if (chosen === "amount" && (!amt || Number(amt) < 1)) {
-        toast("amount needs to be 1+");
-        return;
-      }
-
-      setTaskRepeat(accId, taskId, chosen, until, amt);
+      // enable/disable inputs so it feels guided
+      if (untilInput) untilInput.disabled = !(chosen === "daily" || chosen === "weekly");
+      if (amountInput) amountInput.disabled = !(chosen === "amount");
     }
 
-    radios.forEach((r) => r.addEventListener("change", saveRepeat));
-    if (untilInput) untilInput.addEventListener("change", saveRepeat);
-    if (amountInput) amountInput.addEventListener("change", saveRepeat);
+    radios.forEach(r => r.addEventListener("change", refreshEnabledFields));
+    refreshEnabledFields();
   }
 
   // ----------------------------
@@ -628,6 +724,12 @@
 
       // auto expand the newly created accomplishment (optional)
       const newId = res.accomplishment_id;
+      // keep it open + start inline edit
+      state.expandedAccIds.add(newId);
+      state.editingAccId = newId;
+
+      await reloadGoalAndRender();
+
       const acc = (state.goal.accomplishments || []).find(a =>
         (a.accomplishment_id ?? a.id) === newId || a.id === newId
       );
@@ -714,6 +816,7 @@
 
   async function addTask(accId) {
     try {
+      state.expandedAccIds.add(accId);
       // create in DB (repeat_type must exist; use "none" for now)
       await api(`/api/accomplishments/${accId}/tasks`, {
         method: "POST",
@@ -805,6 +908,8 @@
 
   async function completeTask(accId, taskId) {
     try {
+      state.expandedAccIds.add(accId);
+
       // 1) tell backend “I checked this task”
       await api(`/api/tasks/${taskId}/check`, { method: "POST" });
 
