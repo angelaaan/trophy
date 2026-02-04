@@ -12,8 +12,16 @@
       headers: { "Content-Type": "application/json" },
       ...options,
     });
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+
+    const text = await res.text();
+    let data;
+    try { data = text ? JSON.parse(text) : null; } catch { data = null; }
+
+    if (!res.ok) {
+      const msg = data?.error || text || res.statusText;
+      throw new Error(`[${res.status}] ${msg}`);
+    }
+    return data ?? {};
   }
 
   async function loadGoalFromDB(goalId) {
@@ -124,7 +132,7 @@
 
   async function maybeAutoComplete(accId) {
     // reload fresh DB state first (so counts are real)
-    state.goal = await loadGoalFromDB(state.goalId);
+    state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
 
     const acc = (state.goal.accomplishments || []).find(a =>
       (a.accomplishment_id ?? a.id) === accId
@@ -141,7 +149,7 @@
     await api(`/api/accomplishments/${acc.accomplishment_id ?? accId}/complete`, {method: "POST",});
 
     // reload + re-render so it moves + shows ⭐
-    state.goal = await loadGoalFromDB(state.goalId);
+    state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
     render();
   }
 
@@ -187,7 +195,8 @@
     goal: null,
     showCompletedTasksByAcc: new Map(),
     expandedAccIds: new Set(),
-    editingAccId: null
+    editingAccId: null,
+    editingTaskId: null
   };
 
   function normalizeGoal(goal) {
@@ -335,41 +344,21 @@
     const icons = document.createElement("div");
     icons.className = "acc-icons";
 
-    // eye = toggle showing completed tasks in expanded view
-    const eyeBtn = iconButton("eye", () => {
-      const current = state.showCompletedTasksByAcc.get(acc.id) || false;
-      state.showCompletedTasksByAcc.set(acc.id, !current);
-      // keep expanded state and re-render just this card by full refresh (simple)
-      render();
-      // reopen if it was expanded
-      const newCard = findAccCard(acc.id);
-      if (card.classList.contains("expanded") && newCard) newCard.classList.add("expanded");
-    });
-    icons.appendChild(eyeBtn);
-
     // edit = rename or delete
     const editBtn = iconButton("edit", () => {
       openEditAccomplishment(acc.id);
     });
     icons.appendChild(editBtn);
 
-    meta.appendChild(icons);
-
-    // completion button (only enabled when all tasks fully done)
-    const completeBtn = document.createElement("button");
-    completeBtn.className = "acc-complete";
-    completeBtn.title = "complete accomplishment (cannot undo)";
-    completeBtn.disabled = !allTasksFullyDone(acc);
-    completeBtn.innerHTML = "✓";
-    completeBtn.addEventListener("click", () => {
-      if (!allTasksFullyDone(acc)) {
-        toast("finish all tasks first.");
-        return;
-      }
-      completeAccomplishment(acc.id);
+    // delete accomplishment button
+    const deleteBtn = iconButton("x", () => {
+      deleteAccomplishment(acc.id);
     });
+    deleteBtn.classList.add("icon-x");
+    deleteBtn.title = "delete accomplishment";
+    icons.appendChild(deleteBtn);
 
-    meta.appendChild(completeBtn);
+    meta.appendChild(icons);
     top.appendChild(meta);
 
     card.appendChild(top);
@@ -381,6 +370,18 @@
     // Add task button row (still present before completion)
     const actionsRow = document.createElement("div");
     actionsRow.className = "acc-actions-row";
+
+    const tasks = acc.tasks || [];
+    const hasCompletedTask = tasks.some(t => !!t.is_complete);
+
+    if (hasCompletedTask) {
+      const eyeBtn = iconButton("eye", () => {
+        const current = state.showCompletedTasksByAcc.get(acc.id) || false;
+        state.showCompletedTasksByAcc.set(acc.id, !current);
+        render();
+      });
+      icons.appendChild(eyeBtn);
+    }
 
     const addTaskBtn = document.createElement("button");
     addTaskBtn.className = "btn primary";
@@ -408,7 +409,6 @@
     taskList.className = "task-list";
 
     const showCompleted = state.showCompletedTasksByAcc.get(acc.id) || false;
-    const tasks = acc.tasks || [];
 
     const filtered = showCompleted ? tasks : tasks.filter((t) => !isTaskFullyDone(t));
     if (filtered.length === 0) {
@@ -467,27 +467,18 @@
     const canCheck = canCompleteTaskNow(task);
     check.disabled = !canCheck;
 
-    // Visual checkmark if done for non-repeat, or if current period already checked
-    let showCheck = false;
-    if (!task.repeat || task.repeat.type === "none") {
-      showCheck = !!task.completed;
-    } else {
-      const key = currentPeriodKey(task);
-      if (key) {
-        const comps = Array.isArray(task.completions) ? task.completions : [];
-        showCheck = comps.some((c) => c.periodKey === key);
-      }
-    }
-    check.textContent = showCheck ? "✓" : "";
+    // Visual checkmark to show "show completed tasks" button
+    check.textContent = task.is_complete ? "✓" : "";
 
     check.addEventListener("click", () => {
+      // use the freshest state at click time
       const acc = findAcc(accId);
       if (!acc) return;
 
       const t = findTask(acc, task.id);
       if (!t) return;
 
-      if (!canCompleteTaskNow(t)) {
+      if (t.is_complete) {
         toast("you’ve already completed this task for now!");
         return;
       }
@@ -501,6 +492,21 @@
     title.className = "task-title";
     title.value = task.title || "";
     title.placeholder = "task name…";
+    if (state.editingTaskId === task.id) {
+      row.classList.add("task-editing");
+      title.classList.add("editing");
+
+      setTimeout(() => {
+        title.focus();
+        title.select();
+      }, 0);
+
+      // once it's mounted, clear the flag so it won't refocus forever
+      setTimeout(() => {
+        if (state.editingTaskId === task.id) state.editingTaskId = null;
+      }, 0);
+    }
+
     title.addEventListener("click", (e) => e.stopPropagation());
 
     title.addEventListener("change", () => {
@@ -601,7 +607,7 @@
     const stars = document.createElement("div");
     stars.className = "stars";
     // 2 stars like your mock, you can change later to something meaningful
-    stars.textContent = "⭐ ⭐";
+    stars.textContent = "⭐";
     card.appendChild(stars);
 
     return card;
@@ -744,93 +750,50 @@
   }
 
   async function openEditAccomplishment(accId) {
-    const acc = findAcc(accId);
-    if (!acc) return;
-
-    const newName = prompt("Rename accomplishment:", acc.title || "");
-    if (newName === null) return;
-
-    const trimmed = newName.trim();
-
-    // empty name -> offer delete
-    if (!trimmed) {
-      const sure = confirm("Empty name. Delete accomplishment instead?");
-      if (sure) await deleteAccomplishment(accId);
-      return;
-    }
-
-    try {
-      await api(`/api/accomplishments/${accId}`, {
-        method: "PUT",
-        body: JSON.stringify({ title: trimmed }),
-      });
-
-      await reloadGoalAndRender();
-    } catch (e) {
-      console.error(e);
-      toast("couldn't rename accomplishment");
-    }
+    // keep it open and start inline editing
+    state.editingAccId = accId;
+    state.expandedAccIds.add(accId);
+    render();
   }
 
   async function deleteAccomplishment(accId) {
-    const ok = confirm("Delete this accomplishment? (tasks included)");
-    if (!ok) return;
+    if (!confirm("Delete this accomplishment? This cannot be undone.")) return;
 
     try {
-      await api(`/api/accomplishments/${accId}`, { method: "DELETE" });
+      await api(`/api/accomplishments/${accId}`, {
+        method: "DELETE",
+      });
+
+      state.expandedAccIds.delete(accId);
+      state.editingAccId = null;
+
       await reloadGoalAndRender();
+      toast("accomplishment deleted");
     } catch (e) {
       console.error(e);
       toast("couldn't delete accomplishment");
     }
   }
 
-  function completeAccomplishment(accId) {
-    const goal = state.goal;
-    const idx = (goal.accomplishments || []).findIndex((a) => a.id === accId);
-    if (idx === -1) return;
-
-    const acc = goal.accomplishments[idx];
-
-    if (!allTasksFullyDone(acc)) {
-      toast("finish all tasks first.");
-      return;
-    }
-
-    const ok = confirm("Complete this accomplishment? This cannot be undone.");
-    if (!ok) return;
-
-    acc.completed_at = new Date().toISOString();
-
-    // move to completed list
-    goal.accomplishments.splice(idx, 1);
-    goal.completed = goal.completed || [];
-    goal.completed.unshift({
-      id: acc.id,
-      title: acc.title,
-      completed_at: acc.completed_at
-    });
-
-    render();
-  }
-
   async function addTask(accId) {
     try {
       state.expandedAccIds.add(accId);
-      // create in DB (repeat_type must exist; use "none" for now)
-      await api(`/api/accomplishments/${accId}/tasks`, {
+
+      const res = await api(`/api/accomplishments/${accId}/tasks`, {
         method: "POST",
         body: JSON.stringify({
-          title: "GYM",
+          title: "new task",
           repeat_type: "none",
           target_count: 1,
-          // optional: start_date/end_date left to defaults
         }),
       });
 
-      // reload from DB so tasks now have real task_id
-      state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
-      render();
+      const newTaskId = res.task_id;
+
+      state.editingTaskId = newTaskId;
+      state.expandedAccIds.add(accId);
+
+      await reloadGoalAndRender();
 
       toast("task added. rename it.");
     } catch (e) {
@@ -923,7 +886,12 @@
       render();
     } catch (e) {
       console.error(e);
-      toast("couldn't complete task (maybe already done for now?)");
+      const msg = (e && e.message) ? e.message : "";
+      toast(
+        msg.includes("you've already completed")
+          ? "you’ve already completed this task for now!"
+          : "couldn't complete task"
+      );
     }
   }
 
@@ -958,17 +926,33 @@
     try{
       state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
       render();
-    } catch(e) {
+    } catch (e) {
       console.error(e);
-      alert("couldnt load the goal!! (r u logged in .. is this ur goal..?)");
+      alert(String(e.message || e));
+      return;
     }
 
     // Wire buttons
     $("#addAccomplishmentBtn")?.addEventListener("click", addAccomplishment);
 
+    const completeGoalBtn = document.querySelector("#complete-goal");
+    if (completeGoalBtn) {
+      completeGoalBtn.addEventListener("click", async () => {
+        if (!confirm("Mark this goal as completed?")) return;
+
+        try {
+          await api(`/api/goals/${state.goalId}/complete`, { method: "POST" });
+          await reloadGoalAndRender();
+          toast("goal completed ⭐");
+        } catch (e) {
+          console.error(e);
+          toast("couldn't complete goal");
+        }
+      });
+    }
+
     $("#logoutBtn")?.addEventListener("click", () => {
-      // Frontend-only: just bounce to login/landing if you want.
-      // Later: call backend /logout.
+      // TODO: call backend /logout.
       toast("logout (frontend stub)");
     });
 

@@ -76,6 +76,12 @@ body{
   padding-top: 8px;
 }
 
+.goal-actions .btn {
+  min-width: 96px;
+  text-align: center;
+  padding: 10px 16px;
+}
+
 .layout{
   height: calc(100vh - 120px);
   display:grid;
@@ -237,6 +243,21 @@ body{
 }
 
 .icon-btn svg{ width: 18px; height: 18px; }
+/* Delete (X) button for accomplishments */
+.icon-btn.icon-x {
+  background: rgba(255, 230, 230, 0.6);
+  border-color: rgba(160, 40, 40, 0.5);
+}
+.icon-btn.icon-x::before {
+  content: "×";
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+  color: #a33;
+}
+.icon-btn.icon-x:hover {
+  background: rgba(255, 210, 210, 0.85);
+}
 
 .acc-complete{
   width: 44px;
@@ -457,4 +478,13 @@ hr.sep{
   font-weight: 800;
   box-shadow: 0 12px 26px rgba(0,0,0,0.22);
   z-index: 50;
+}
+
+.task-title.editing {
+  outline: 2px solid rgba(255,255,255,0.8);
+  border-radius: 8px;
+}
+.task-row.task-editing {
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.35) inset;
+  border-radius: 14px;
 }

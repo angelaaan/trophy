@@ -5,20 +5,6 @@ const router = express.Router();
 const { ensureGoalOwner } = require("../utils/ownership");
 
 module.exports = function goalsRoutes({ db, requireAuth }) {
-  /**
-   * GET /api/goals/:goal_id/full
-   * Returns:
-   * {
-   *   goal_id, title, description, ...
-   *   accomplishments: [
-   *     {
-   *       accomplishment_id, title, is_completed, completed_at, ...
-   *       tasks: [{ task_id, title, repeat_type, total_required, completion_count, is_complete, ... }]
-   *       totalTasks, completedTasks
-   *     }
-   *   ]
-   * }
-   */
   router.get("/api/goals/:goal_id/full", requireAuth, (req, res) => {
     const goal_id = Number(req.params.goal_id);
     if (!goal_id) return res.status(400).json({ error: "bad goal_id" });
@@ -96,6 +82,32 @@ module.exports = function goalsRoutes({ db, requireAuth }) {
       });
     });
   });
+
+  router.post("/api/goals/:goal_id/complete", requireAuth, async (req, res) => {
+    try {
+      const goalId = Number(req.params.goal_id);
+      const username = req.session.user.username;
+
+      // ensure ownership
+      const goal = await db.get(
+        "SELECT goal_id FROM goals WHERE goal_id = ? AND username = ?",
+        [goalId, username]
+      );
+      if (!goal) return res.status(404).json({ error: "Goal not found" });
+
+      // mark completed
+      await db.run(
+        "UPDATE goals SET completed_at = COALESCE(completed_at, datetime('now')) WHERE goal_id = ?",
+        [goalId]
+      );
+
+      res.json({ ok: true });
+    } catch (e) {
+      console.error(e);
+      res.status(500).json({ error: "Failed to complete goal" });
+    }
+  });
+
 
   return router;
 };
