@@ -322,3 +322,64 @@ body.home {
   color: #fff;
 }
 
+/* --- Shelf page overrides --- */
+body.shelf {
+  margin: 0;
+  min-height: 100vh;
+
+  /* override any global flex pushing things to the bottom */
+  display: flex !important;
+  flex-direction: column;
+  justify-content: flex-start !important;
+  align-items: stretch;
+
+  /* background image */
+  background: url("/assets/signuplogin.png") center/cover no-repeat fixed;
+}
+
+/* top bar */
+.shelf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 32px;
+}
+
+/* content wrapper */
+.shelf-wrap {
+  flex: 1;
+  padding: 40px 80px 80px;
+}
+
+/* each shelf "row" */
+.shelf-row {
+  margin: 0 0 70px 0;
+}
+
+/* 4 trophies per shelf */
+.shelf-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 40px;
+  align-items: end;
+  padding-bottom: 22px;
+
+  /* the shelf line */
+  border-bottom: 14px solid #122020;
+  border-radius: 10px;
+}
+
+.trophy-item {
+  text-align: center;
+}
+
+.trophy-img {
+  width: 120px;
+  height: auto;
+  display: block;
+  margin: 0 auto 10px;
+}
+
+.trophy-label {
+  font-weight: 700;
+}

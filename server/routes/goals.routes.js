@@ -58,13 +58,13 @@ module.exports = function goalsRoutes({ db, requireAuth }) {
                   byAcc[aid].push({
                     ...t,
                     completion_count: count,
-                    is_complete: totalReq > 0 ? count >= totalReq : false,
+                    is_completed: totalReq > 0 ? count >= totalReq : false,
                   });
                 }
 
                 const enriched = accomplishments.map((a) => {
                   const tlist = byAcc[a.accomplishment_id] || [];
-                  const completedTasks = tlist.filter((t) => t.is_complete).length;
+                  const completedTasks = tlist.filter((t) => t.is_completed).length;
 
                   return {
                     ...a,
@@ -95,9 +95,54 @@ module.exports = function goalsRoutes({ db, requireAuth }) {
       );
       if (!goal) return res.status(404).json({ error: "Goal not found" });
 
-      // mark completed
+      // block completion unless all tasks are complete
+      const row = await db.get(
+      `
+      WITH task_counts AS (
+        SELECT
+          t.task_id,
+          a.accomplishment_id,
+          COALESCE(NULLIF(t.total_required, 0), 1) AS total_required,
+          IFNULL(c.cnt, 0) AS completion_count
+        FROM tasks t
+        JOIN accomplishments a ON a.accomplishment_id = t.accomplishment_id
+        LEFT JOIN (
+          SELECT task_id, COUNT(*) AS cnt
+          FROM task_completions
+          GROUP BY task_id
+        ) c ON c.task_id = t.task_id
+        WHERE a.goal_id = ?
+      ),
+      acc_stats AS (
+        SELECT
+          accomplishment_id,
+          COUNT(*) AS task_total,
+          SUM(CASE WHEN completion_count >= total_required THEN 1 ELSE 0 END) AS task_done
+        FROM task_counts
+        GROUP BY accomplishment_id
+      )
+      SELECT
+        -- accomplishments that are still "active":
+        -- either have 0 tasks (shouldn't happen if you enforce it)
+        -- OR not all tasks done
+        SUM(CASE WHEN task_total < 1 OR task_done < task_total THEN 1 ELSE 0 END) AS active_accomplishments
+      FROM acc_stats
+      `,
+        [goalId]
+      );
+
+      if (row.remaining > 0) {
+        return res.status(400).json({ error: "Finish all tasks before completing the goal." });
+      }
+
+      // mark completed (SET BOTH FIELDS)
       await db.run(
-        "UPDATE goals SET completed_at = COALESCE(completed_at, datetime('now')) WHERE goal_id = ?",
+        `
+        UPDATE goals
+        SET is_completed = 1,
+            completed_at = COALESCE(completed_at, datetime('now'))
+        WHERE goal_id = ?
+        `,
         [goalId]
       );
 
@@ -108,6 +153,24 @@ module.exports = function goalsRoutes({ db, requireAuth }) {
     }
   });
 
+  router.get("/api/goals/shelf", requireAuth, (req, res) => {
+    const username = req.session.user.username;
+
+    db.all(
+      `
+      SELECT goal_id, title, description, created_at, completed_at
+      FROM goals
+      WHERE username = ?
+        AND is_completed = 1
+      ORDER BY completed_at DESC, goal_id DESC
+      `,
+      [username],
+      (err, rows) => {
+        if (err) return res.status(500).json({ error: "database error" });
+        res.json(rows);
+      }
+    );
+  });
 
   return router;
 };

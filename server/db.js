@@ -30,6 +30,8 @@ db.serialize(() => {
       title TEXT NOT NULL,
       description TEXT,
       created_at TEXT DEFAULT (datetime('now')),
+      is_completed INTEGER DEFAULT 0,
+      completed_at TEXT,
       FOREIGN KEY (username) REFERENCES users(username)
         ON DELETE CASCADE
     )

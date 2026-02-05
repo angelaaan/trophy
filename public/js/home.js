@@ -90,6 +90,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (e.target.id === "modalOverlay") closeModal();
   });
 
+  document.getElementById("shelfBtn")?.addEventListener("click", () => {
+    window.location.href = "shelf.html";
+  });
+
   // ESC closes
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeModal();
@@ -97,11 +101,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       // Enter submits when modal open
       createGoalFromModal();
     }
-  });
-
-  // shelf placeholder
-  document.getElementById("shelfBtn").addEventListener("click", () => {
-    alert("shelf later 👀");
   });
 
   // load goals

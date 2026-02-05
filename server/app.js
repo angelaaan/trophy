@@ -158,9 +158,10 @@ app.get("/api/goals", requireAuth, (req, res) => {
 
   db.all(
     `SELECT goal_id, title, description, created_at
-     FROM goals
-     WHERE username = ?
-     ORDER BY created_at DESC`,
+    FROM goals
+    WHERE username = ?
+      AND (is_completed = 0 OR is_completed IS NULL)
+    ORDER BY created_at DESC`,
     [username],
     (err, rows) => {
       if (err) {
