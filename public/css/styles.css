@@ -160,9 +160,6 @@ body.home {
 
 /* shelf button (top right) */
 .home-shelf {
-  position: fixed;
-  top: 24px;
-  right: 24px;
   padding: 10px 18px;
   border-radius: 999px;
   border: 3px solid #000;
@@ -171,6 +168,21 @@ body.home {
   font-family: "Anton", system-ui, sans-serif;
   letter-spacing: 0.08em;
   cursor: pointer;
+}
+
+
+/* top-right actions (shelf + logout) */
+.home-top-actions {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  display: flex;
+  gap: 12px;
+}
+
+/* logout variant (slightly lighter) */
+.home-shelf.ghost {
+  background: rgba(255, 255, 255, 0.55);
 }
 
 /* bottom CTA */
@@ -214,25 +226,90 @@ body.home {
 
 /* goal card */
 .goal-card {
+  position: relative;
   width: 100%;
   max-width: 180px;
   aspect-ratio: 1 / 1;
   border-radius: 10px;
   background: rgba(120, 120, 120, 0.8);
-  display: grid;
-  place-items: center;
-  text-align: center;
-  padding: 14px;
 
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+
+  padding: 14px;
   color: #fff;
-  font-family: "Patrick Hand", system-ui, sans-serif; /* optional: if you want the handwritten look */
+  font-family: "Patrick Hand", system-ui, sans-serif;
   font-size: 26px;
   line-height: 1.05;
 }
 
-/* if you don't want handwritten font, delete the line above and uncomment this:
-.goal-card { font-family: "Anton", system-ui, sans-serif; letter-spacing: 0.02em; }
-*/
+.goal-card-header {
+  position: relative;
+  height: 48px;
+  width: 100%;
+}
+
+.goal-title {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-weight: 700;
+  pointer-events: none;
+
+  transform: translateY(-25px);
+}
+
+
+/* three dots pinned to top-right */
+.goal-menu-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 10px;
+  pointer-events: auto;
+}
+
+.goal-menu {
+  position: absolute;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.15);
+  border-radius: 12px;
+  padding: 6px;
+  min-width: 140px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.18);
+}
+
+.goal-menu button {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 10px;
+}
+
+.goal-menu button:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+.goal-menu .danger {
+  color: #c62828;
+}
+
+.goal-menu-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
 
 /* ====== Modal ====== */
 .modal-overlay {
@@ -382,4 +459,22 @@ body.shelf {
 
 .trophy-label {
   font-weight: 700;
+}
+
+.repeat-config {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.repeat-field label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.hidden {
+  display: none !important;
 }

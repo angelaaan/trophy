@@ -434,6 +434,7 @@
       const isInteractive =
         e.target.closest("button") ||
         e.target.closest("input") ||
+        e.target.closest("label") ||
         e.target.isContentEditable ||
         tag === "input" ||
         tag === "button";
@@ -657,56 +658,75 @@
     const until = task.end_date || "";
     const amount = (type === "amount") ? String(task.total_required || "") : "";
 
+    // IMPORTANT: unique radio group per task (prevents cross-task radio conflicts)
+    const group = `repeatType_${task.id}`;
+
     return `
       <div class="small"><b>repeat</b> (choose one)</div>
+
       <div class="repeat-grid">
         <label class="repeat-row">
-          <input type="radio" name="repeatType" value="none" ${type === "none" ? "checked" : ""}/>
+          <input type="radio" name="${group}" value="none" ${type === "none" ? "checked" : ""}/>
           none
         </label>
         <label class="repeat-row">
-          <input type="radio" name="repeatType" value="daily" ${type === "daily" ? "checked" : ""}/>
+          <input type="radio" name="${group}" value="daily" ${type === "daily" ? "checked" : ""}/>
           daily
         </label>
         <label class="repeat-row">
-          <input type="radio" name="repeatType" value="weekly" ${type === "weekly" ? "checked" : ""}/>
+          <input type="radio" name="${group}" value="weekly" ${type === "weekly" ? "checked" : ""}/>
           weekly
         </label>
         <label class="repeat-row">
-          <input type="radio" name="repeatType" value="amount" ${type === "amount" ? "checked" : ""}/>
+          <input type="radio" name="${group}" value="amount" ${type === "amount" ? "checked" : ""}/>
           amount
         </label>
       </div>
 
       <div class="repeat-config">
-        <div>
-          <label>until date (daily/weekly)</label>
+        <div class="repeat-field" data-show-for="daily weekly">
+          <label>until date</label>
           <input type="date" data-field="until_date" value="${until}" />
         </div>
-        <div>
-          <label>amount (for amount)</label>
+
+        <div class="repeat-field" data-show-for="amount">
+          <label>amount</label>
           <input type="number" min="1" step="1" data-field="amount" value="${amount}" placeholder="e.g. 7"/>
         </div>
-      </div>
-
-      <div class="small" style="margin-top:8px;">
-        daily/weekly = calendar end date • amount = number of check-offs
       </div>
     `;
   }
 
   function wireRepeatBox(box, accId, taskId) {
-    // no autosave — user saves by clicking ✓ on the repeat button
-    const radios = $$('input[type="radio"][name="repeatType"]', box);
+    // radios are now unique per task, so just grab all radios in THIS box
+    const radios = $$('input[type="radio"]', box);
     const untilInput = $('input[data-field="until_date"]', box);
     const amountInput = $('input[data-field="amount"]', box);
+    const untilWrap = untilInput?.closest(".repeat-field");
+    const amountWrap = amountInput?.closest(".repeat-field");
+
+    function chosenValue() {
+      return radios.find(r => r.checked)?.value || "none";
+    }
+
+    function setVisible(el, visible) {
+      if (!el) return;
+      el.classList.toggle("hidden", !visible);
+    }
 
     function refreshEnabledFields() {
-      const chosen = radios.find(r => r.checked)?.value || "none";
+      const chosen = chosenValue();
 
-      // enable/disable inputs so it feels guided
-      if (untilInput) untilInput.disabled = !(chosen === "daily" || chosen === "weekly");
-      if (amountInput) amountInput.disabled = !(chosen === "amount");
+      const showUntil = (chosen === "daily" || chosen === "weekly");
+      const showAmount = (chosen === "amount");
+
+      // show/hide
+      setVisible(untilWrap, showUntil);
+      setVisible(amountWrap, showAmount);
+
+      // also keep disabled logic (good UX + prevents accidental reads)
+      if (untilInput) untilInput.disabled = !showUntil;
+      if (amountInput) amountInput.disabled = !showAmount;
     }
 
     radios.forEach(r => r.addEventListener("change", refreshEnabledFields));

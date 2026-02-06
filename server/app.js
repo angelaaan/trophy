@@ -19,7 +19,8 @@ app.use(cors()); // TODO : lock this down
 app.use(express.json());
 
 app.get("/", (req, res) => {
-  res.redirect("/home.html");
+  if (req.session.user) return res.redirect("/home.html");
+  return res.redirect("/login.html");
 });
 
 // ensure foreign keys are actually enforced in SQLite
@@ -178,6 +179,18 @@ app.use(accomplishmentsRoutes({ db, requireAuth }));
 app.use(tasksRoutes({ db, requireAuth }));
 
 // static frontend
+// protect these pages if not logged in
+const protectedPages = new Set(["/home.html", "/shelf.html", "/goal.html"]);
+
+app.use((req, res, next) => {
+  if (protectedPages.has(req.path)) {
+    if (!req.session.user) {
+      return res.redirect("/login.html");
+    }
+  }
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "..", "public")));
 
 // start
