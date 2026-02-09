@@ -18,11 +18,6 @@ const PORT = process.env.PORT || 3000;
 app.use(cors()); // TODO : lock this down
 app.use(express.json());
 
-app.get("/", (req, res) => {
-  if (req.session.user) return res.redirect("/home.html");
-  return res.redirect("/login.html");
-});
-
 // ensure foreign keys are actually enforced in SQLite
 db.run("PRAGMA foreign_keys = ON");
 
@@ -39,11 +34,16 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false, // true only when deploying with HTTPS
+      secure: false, 
       maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
     },
   })
 );
+
+app.get("/", (req, res) => {
+  if (req.session.user) return res.redirect("/home.html");
+  return res.redirect("/login.html");
+});
 
 // requires authentication to start a session (security)
 function requireAuth(req, res, next) {

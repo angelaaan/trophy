@@ -460,21 +460,3 @@ body.shelf {
 .trophy-label {
   font-weight: 700;
 }
-
-.repeat-config {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.repeat-field label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 12px;
-  opacity: 0.85;
-}
-
-.hidden {
-  display: none !important;
-}

@@ -414,6 +414,17 @@ body{
   align-items:center;
   gap: 10px;
   font-weight: 800;
+  padding: 10px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.repeat-row:hover{
+  background: rgba(255,255,255,0.25);
+}
+
+.repeat-row input[type="radio"]{
+  transform: scale(1.25);
 }
 
 .repeat-row input[type="radio"]{

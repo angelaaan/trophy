@@ -64,9 +64,12 @@ function escapeHtml(s = "") {
 }
 
 async function init() {
-  document.getElementById("logoutBtn")?.addEventListener("click", () => {
-    // if you have a real logout endpoint, call it here
-    window.location.href = "index.html";
+  document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+    const ok = confirm("Log out?");
+    if (!ok) return;
+
+    await fetch("/api/logout", { method: "POST", credentials: "include" });
+    window.location.replace("/login.html");
   });
 
   const goals = await api("/api/goals/shelf");

@@ -99,11 +99,11 @@
 
   function canCompleteTaskNow(task) {
     // Let backend enforce daily/weekly limits; we only block if fully complete
-    return !task.is_complete;
+    return !isTaskFullyDone(task);
   }
 
   function isTaskFullyDone(task) {
-    return !!task.is_complete;
+    return !!(task.is_complete ?? task.is_completed);
   }
 
   function computeAccomplishmentProgress(acc) {
@@ -127,7 +127,7 @@
   function allTasksFullyDone(acc) {
     const tasks = acc.tasks || [];
     if (tasks.length === 0) return false;
-    return tasks.every(t => !!t.is_complete);
+    return tasks.every(t => isTaskFullyDone(t));
   }
 
   async function maybeAutoComplete(accId) {
@@ -142,7 +142,7 @@
     const tasks = acc.tasks || [];
     if (tasks.length < 1) return;
 
-    const allDone = tasks.every(t => t.is_complete === true);
+    const allDone = tasks.every(t => isTaskFullyDone(t));
     if (!allDone) return;
 
     // call your backend “complete accomplishment” endpoint
@@ -372,7 +372,7 @@
     actionsRow.className = "acc-actions-row";
 
     const tasks = acc.tasks || [];
-    const hasCompletedTask = tasks.some(t => !!t.is_complete);
+    const hasCompletedTask = tasks.some(t => isTaskFullyDone(t));
 
     if (hasCompletedTask) {
       const eyeBtn = iconButton("eye", () => {
@@ -435,6 +435,7 @@
         e.target.closest("button") ||
         e.target.closest("input") ||
         e.target.closest("label") ||
+        e.target.closest(".repeat-box") ||
         e.target.isContentEditable ||
         tag === "input" ||
         tag === "button";
@@ -469,7 +470,7 @@
     check.disabled = !canCheck;
 
     // Visual checkmark to show "show completed tasks" button
-    check.textContent = task.is_complete ? "✓" : "";
+    check.textContent = isTaskFullyDone(task) ? "✓" : "";
 
     check.addEventListener("click", () => {
       // use the freshest state at click time
@@ -479,7 +480,7 @@
       const t = findTask(acc, task.id);
       if (!t) return;
 
-      if (t.is_complete) {
+      if (isTaskFullyDone(t)) {
         toast("you’ve already completed this task for now!");
         return;
       }
@@ -548,7 +549,7 @@
         repBtn.dataset.mode = "open";
       } else {
         // already open -> SAVE
-        const chosen = box.querySelector('input[type="radio"][name="repeatType"]:checked')?.value || "none";
+        const chosen = box.querySelector('input[type="radio"]:checked')?.value || "none";
         const until = box.querySelector('input[data-field="until_date"]')?.value || "";
         const amt = box.querySelector('input[data-field="amount"]')?.value || "";
 
@@ -896,7 +897,7 @@
       // 1) tell backend “I checked this task”
       await api(`/api/tasks/${taskId}/check`, { method: "POST" });
 
-      // 2) refresh goal from DB (so progress + is_complete updates)
+      // 2) refresh goal from DB 
       state.goal = normalizeGoal(await loadGoalFromDB(state.goalId));
 
       // 3) now see if accomplishment should auto-complete
@@ -971,9 +972,12 @@
       });
     }
 
-    $("#logoutBtn")?.addEventListener("click", () => {
-      // TODO: call backend /logout.
-      toast("logout (frontend stub)");
+    document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+      const ok = confirm("Log out?");
+      if (!ok) return;
+
+      await fetch("/api/logout", { method: "POST", credentials: "include" });
+      window.location.replace("/login.html");
     });
 
   }
