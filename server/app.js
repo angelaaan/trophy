@@ -12,38 +12,29 @@ const SQLiteStore = require("connect-sqlite3")(session);
 const db = require("./db");
 
 const app = express();
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 
-// middleware
-app.use(cors()); // TODO : lock this down
+app.use(cors());
 app.use(express.json());
 
-// ensure foreign keys are actually enforced in SQLite
-db.run("PRAGMA foreign_keys = ON");
-
-// setting sessions after valid login
 app.use(
   session({
-    store: new SQLiteStore({
-      db: "sessions.db",
-      dir: __dirname, // backend/
-    }),
+    store: new SQLiteStore({ db: "sessions.db", dir: __dirname }),
     secret: "replace_this_with_a_long_random_string",
     resave: false,
     saveUninitialized: false,
-    cookie: {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: false, 
-      maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
-    },
+    cookie: { httpOnly: true, sameSite: "lax", secure: false, maxAge: 1000 * 60 * 60 * 24 * 7 },
   })
 );
 
 app.get("/", (req, res) => {
-  if (req.session.user) return res.redirect("/home.html");
+  if (req.session?.user) return res.redirect("/home.html");
   return res.redirect("/login.html");
 });
+
+// ensure foreign keys are actually enforced in SQLite
+db.run("PRAGMA foreign_keys = ON");
 
 // requires authentication to start a session (security)
 function requireAuth(req, res, next) {
