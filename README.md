@@ -79,7 +79,7 @@ Repeat rules are enforced server-side:
 ---
 
 ## 📁 Project Structure
-`trophy/
+```trophy/
 ├── public/
 │ ├── assets/ # Images (trophies, backgrounds)
 │ ├── css/
@@ -117,7 +117,7 @@ Repeat rules are enforced server-side:
 │
 ├── package.json
 ├── package-lock.json
-└── README.md`
+└── README.md```
 
 ---
 
