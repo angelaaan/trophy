@@ -30,7 +30,7 @@ app.use(
 
 app.get("/", (req, res) => {
   if (req.session?.user) return res.redirect("/home.html");
-  return res.redirect("/login.html");
+  return res.redirect("/index.html");
 });
 
 // ensure foreign keys are actually enforced in SQLite
